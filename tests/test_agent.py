@@ -9,6 +9,8 @@ from pydantic_ai.messages import ToolCallPart, ToolReturnPart
 from pydantic_ai.models.test import TestModel
 
 from app.agent import agent
+from app.ask import ask
+from app.config import MODEL
 
 BASE_TOOLS = {"search_glossary", "get_lecture_summary"}
 
@@ -37,3 +39,36 @@ def test_glossary_result_reaches_the_model():
         result = agent.run_sync("RAGとは？")
     returns = _parts(result, ToolReturnPart)
     assert returns and returns[0].tool_name == "search_glossary"
+
+
+def test_ask_reports_token_usage(capsys, monkeypatch):
+    class FakeResponse:
+        text = "回答"
+        usage_metadata = type(
+            "UsageMetadata",
+            (),
+            {"prompt_token_count": 123, "candidates_token_count": 45},
+        )()
+
+    class FakeClient:
+        def __init__(self, api_key):
+            self.api_key = api_key
+
+        @property
+        def models(self):
+            return self
+
+        def generate_content(self, model, contents):
+            assert model == MODEL
+            assert contents == "質問"
+            return FakeResponse()
+
+    monkeypatch.setattr("app.ask.get_api_key", lambda: "fake-key")
+    monkeypatch.setattr("app.ask.genai.Client", FakeClient)
+
+    result = ask("質問")
+
+    assert result == "回答"
+    captured = capsys.readouterr()
+    assert "入力トークン数: 123" in captured.out
+    assert "出力トークン数: 45" in captured.out
