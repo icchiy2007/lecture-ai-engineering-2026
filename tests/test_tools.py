@@ -34,6 +34,23 @@ def test_search_reports_not_found():
     assert "見つかりませんでした" in tools.search_glossary("存在しない用語xyz")
 
 
+def test_make_quiz_returns_question_and_answer():
+    quiz = json.loads(tools.make_quiz(3))
+    terms = [entry for entry in tools.load_glossary() if entry["lecture"] == 3]
+    entry = next(
+        entry for entry in terms
+        if quiz["question"] == f"「{entry['term']}」の意味は？"
+    )
+    assert quiz == {
+        "question": f"「{entry['term']}」の意味は？",
+        "answer": entry["definition"],
+    }
+
+
+def test_make_quiz_reports_when_lecture_has_no_terms():
+    assert "第99回の用語は用語集にありません" in tools.make_quiz(99)
+
+
 def test_lecture_summary():
     assert "エージェント" in tools.get_lecture_summary(3)
     assert "まだありません" in tools.get_lecture_summary(99)
